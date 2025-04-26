@@ -1,0 +1,1 @@
+This repository contains a Streamlit-based interactive dashboard designed for filtering and visualizing data from an Excel file. The dashboard allows users to filter data by material/product tested, standards, and top-N standards dynamically. It also includes bar charts, pie charts, and statistics to analyze the dataset effectively.
