@@ -89,11 +89,18 @@ if fl is not None:
         st.write(filtered_df.head(5))
 
         # Get sensor lists
-        temp_cols = [col for col in filtered_df.columns if 'Temperature' in col]
+       
+        temp_cols = [col for col in filtered_df.columns if 'temp' in col.lower()]
         for col in temp_cols:
-            filtered_df[col] = filtered_df[col].astype(str).str.replace(',', '.')
+            # Convert to string, strip spaces, replace comma with dot
+            filtered_df[col] = filtered_df[col].astype(str).str.replace(',', '.').str.strip()
+            # Remove non-numeric characters
             filtered_df[col] = filtered_df[col].str.extract(r'([-+]?\d*\.?\d+)')
+            # Convert to float
             filtered_df[col] = pd.to_numeric(filtered_df[col], errors='coerce')
+        
+        # Drop rows where datetime is NaT
+        filtered_df = filtered_df.dropna(subset=['datetime'])
         hum_cols = [col for col in filtered_df.columns if 'Humidity' in col]
 
         # Temperature Plot
@@ -212,6 +219,7 @@ if fl is not None:
 else:
 
     st.warning("Please upload a file to proceed.")
+
 
 
 
