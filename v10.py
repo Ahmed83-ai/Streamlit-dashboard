@@ -1,11 +1,9 @@
 import streamlit as st
-from streamlit_plotly_events import plotly_events
 import pandas as pd
 import plotly.express as px
 import os
 import warnings
 from statistics import mode
-from streamlit.runtime.caching import cache_data
 
 warnings.filterwarnings("ignore")
 
@@ -15,9 +13,8 @@ st.title(" :bar_chart: Python Statistics Dashboard_Humidity_NMCC_SASO")
 st.markdown("<style>div.block-container{padding-top:2rem;} </style>", unsafe_allow_html=True)
 
 # File uploader
-fl = st.file_uploader(" :file_folder: Please upload a file", type=(["csv", "xlsx", "xls", "txt"]))
+fl = st.file_uploader(" :file_folder: Please upload a file", type=["csv", "xlsx", "xls", "txt"])
 
-@cache_data
 def read_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -53,24 +50,40 @@ if fl is not None:
         datetime_col = df.columns[0]
         df[datetime_col] = pd.to_datetime(df[datetime_col], errors='coerce')
 
+        # Skip if datetime parsing failed completely
+        if df[datetime_col].isna().all():
+            st.error("❌ Failed to parse datetime column. Please check your file format.")
+            st.stop()
+
         df['date'] = df[datetime_col].dt.date
         df['time'] = df[datetime_col].dt.time
         df = df.drop(datetime_col, axis=1)
         columns = ['date', 'time'] + [col for col in df.columns if col not in ['date', 'time']]
         df = df[columns]
-        df['datetime'] = pd.to_datetime(df['date'].astype(str) + ' ' + df['time'].astype(str))
+        df['datetime'] = pd.to_datetime(df['date'].astype(str) + ' ' + df['time'].astype(str), errors='coerce')
 
-        colms = df.columns.to_list()[2:-1]  # Exclude date, time, datetime
+        # Convert numeric columns
+        colms = df.columns.to_list()[2:-1]  # exclude date, time, datetime
         df[colms] = df[colms].apply(pd.to_numeric, errors='coerce')
 
         # Sidebar
         url = "https://th.bing.com/th/id/R.2d3c79b1699019e964f4e82b2a40c81c?rik=PIZK9MUpT6aZcQ&riu=http%3a%2f%2fwww.saudireadymix.com%2fwp-content%2fuploads%2f2018%2f07%2fsaso-logo-300x225.png&ehk=vWN6vnN03wlp59myw0uCfEzncMhz%2b8zcT79y1oxsl2s%3d&risl=&pid=ImgRaw&r=0"
-        st.sidebar.image(url, width=200)  # 'stretch' is not valid; use int or omit
+        st.sidebar.image(url, width=200)
         st.sidebar.header("Filter Data")
-        start_date = st.sidebar.date_input("Start date", df['date'].min())
-        end_date = st.sidebar.date_input("End date", df['date'].max())
-        start_time = st.sidebar.time_input("Start time", pd.Timestamp('00:00:00').time())
-        end_time = st.sidebar.time_input("End time", pd.Timestamp('23:59:59').time())
+
+        # Ensure there are valid dates
+        valid_dates = df['date'].dropna()
+        if valid_dates.empty:
+            st.error("❌ No valid dates found after cleaning.")
+            st.stop()
+
+        min_date = valid_dates.min()
+        max_date = valid_dates.max()
+
+        start_date = st.sidebar.date_input("Start date", value=min_date)
+        end_date = st.sidebar.date_input("End date", value=max_date)
+        start_time = st.sidebar.time_input("Start time", value=pd.Timestamp('00:00:00').time())
+        end_time = st.sidebar.time_input("End time", value=pd.Timestamp('23:59:59').time())
 
         # Filter data
         mask = (
@@ -79,7 +92,11 @@ if fl is not None:
             (df['time'] >= start_time) &
             (df['time'] <= end_time)
         )
-        filtered_df = df.loc[mask]
+        filtered_df = df.loc[mask].copy()
+
+        if filtered_df.empty:
+            st.warning("⚠️ No data matches the selected date/time range.")
+            st.stop()
 
         st.write("Filtered Data Preview:")
         st.write(filtered_df.head(5))
@@ -101,17 +118,17 @@ if fl is not None:
             )
             temp_fig.update_layout(dragmode='select')
 
-            # Use plotly_events ONLY — it renders the chart AND captures events
-            selected_points = plotly_events(temp_fig, select_event=True)
+            # Use NATIVE Streamlit selection (works on Cloud!)
+            temp_chart_output = st.plotly_chart(temp_fig, on_select="ignore", key="temp_chart")
 
-            # Filter based on selection
-            if selected_points:
-                selected_indices = [point['pointIndex'] for point in selected_points]
+            # Extract selection (optional: use "rerun" if you want auto-refresh)
+            if hasattr(temp_chart_output, 'selection') and temp_chart_output.selection:
+                selected_indices = [p["point_index"] for p in temp_chart_output.selection["points"]]
                 filtered_temp_df = filtered_df.iloc[selected_indices]
             else:
                 filtered_temp_df = filtered_df
 
-            # Display stats
+            # Stats
             st.subheader("📊 Temperature Statistics")
             for sensor in temp_cols:
                 with st.expander(f"{sensor} Statistics"):
@@ -123,10 +140,10 @@ if fl is not None:
                             mode_val = "No unique mode"
                         stats = {
                             "Count": len(sensor_data),
-                            "Max": sensor_data.max(),
-                            "Min": sensor_data.min(),
+                            "Max": round(sensor_data.max(), 2),
+                            "Min": round(sensor_data.min(), 2),
                             "Mean": round(sensor_data.mean(), 2),
-                            "Median": sensor_data.median(),
+                            "Median": round(sensor_data.median(), 2),
                             "Mode": mode_val,
                             "Std": round(sensor_data.std(), 2),
                             "Std/Count": round(sensor_data.std() / len(sensor_data), 4) if len(sensor_data) > 0 else None
@@ -153,17 +170,16 @@ if fl is not None:
             )
             hum_fig.update_layout(dragmode='select')
 
-            # Use plotly_events ONLY
-            selected_points = plotly_events(hum_fig, select_event=True)
+            # Native selection
+            hum_chart_output = st.plotly_chart(hum_fig, on_select="ignore", key="hum_chart")
 
-            # Filter based on selection
-            if selected_points:
-                selected_indices = [point['pointIndex'] for point in selected_points]
+            if hasattr(hum_chart_output, 'selection') and hum_chart_output.selection:
+                selected_indices = [p["point_index"] for p in hum_chart_output.selection["points"]]
                 filtered_hum_df = filtered_df.iloc[selected_indices]
             else:
                 filtered_hum_df = filtered_df
 
-            # Display stats
+            # Stats
             st.subheader("📊 Humidity Statistics")
             for sensor in hum_cols:
                 with st.expander(f"{sensor} Statistics"):
@@ -175,10 +191,10 @@ if fl is not None:
                             mode_val = "No unique mode"
                         stats = {
                             "Count": len(sensor_data),
-                            "Max": sensor_data.max(),
-                            "Min": sensor_data.min(),
+                            "Max": round(sensor_data.max(), 2),
+                            "Min": round(sensor_data.min(), 2),
                             "Mean": round(sensor_data.mean(), 2),
-                            "Median": sensor_data.median(),
+                            "Median": round(sensor_data.median(), 2),
                             "Mode": mode_val,
                             "Std": round(sensor_data.std(), 2),
                             "Std/Count": round(sensor_data.std() / len(sensor_data), 4) if len(sensor_data) > 0 else None
