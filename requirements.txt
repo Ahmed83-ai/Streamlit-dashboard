@@ -2,3 +2,4 @@ streamlit
 streamlit-plotly-events
 pandas
 plotly
+openpyxl
