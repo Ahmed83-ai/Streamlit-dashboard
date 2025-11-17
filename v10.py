@@ -50,7 +50,6 @@ if fl is not None:
         datetime_col = df.columns[0]
         df[datetime_col] = pd.to_datetime(df[datetime_col], errors='coerce')
 
-        # Skip if datetime parsing failed completely
         if df[datetime_col].isna().all():
             st.error("❌ Failed to parse datetime column. Please check your file format.")
             st.stop()
@@ -62,7 +61,6 @@ if fl is not None:
         df = df[columns]
         df['datetime'] = pd.to_datetime(df['date'].astype(str) + ' ' + df['time'].astype(str), errors='coerce')
 
-        # Convert numeric columns
         colms = df.columns.to_list()[2:-1]  # exclude date, time, datetime
         df[colms] = df[colms].apply(pd.to_numeric, errors='coerce')
 
@@ -71,7 +69,6 @@ if fl is not None:
         st.sidebar.image(url, width=200)
         st.sidebar.header("Filter Data")
 
-        # Ensure there are valid dates
         valid_dates = df['date'].dropna()
         if valid_dates.empty:
             st.error("❌ No valid dates found after cleaning.")
@@ -85,7 +82,6 @@ if fl is not None:
         start_time = st.sidebar.time_input("Start time", value=pd.Timestamp('00:00:00').time())
         end_time = st.sidebar.time_input("End time", value=pd.Timestamp('23:59:59').time())
 
-        # Filter data
         mask = (
             (df['date'] >= start_date) &
             (df['date'] <= end_date) &
@@ -101,11 +97,12 @@ if fl is not None:
         st.write("Filtered Data Preview:")
         st.write(filtered_df.head(5))
 
-        # Get sensor columns
         temp_cols = [col for col in filtered_df.columns if 'Temperature' in col]
         hum_cols = [col for col in filtered_df.columns if 'Humidity' in col]
 
-        # === Temperature Section ===
+        # ==============================
+        # TEMPERATURE SECTION
+        # ==============================
         st.subheader("🌡️ Temperature Sensors Visualization")
         if temp_cols:
             temp_fig = px.line(
@@ -118,17 +115,21 @@ if fl is not None:
             )
             temp_fig.update_layout(dragmode='select')
 
-            # Use NATIVE Streamlit selection (works on Cloud!)
-            temp_chart_output = st.plotly_chart(temp_fig, on_select="ignore", key="temp_chart")
+            # Render with selection support (MUST use "rerun")
+            temp_chart_output = st.plotly_chart(temp_fig, on_select="rerun", key="temp_chart")
 
-            # Extract selection (optional: use "rerun" if you want auto-refresh)
-            if hasattr(temp_chart_output, 'selection') and temp_chart_output.selection:
+            # Safely extract selected indices
+            selected_indices = []
+            if (
+                temp_chart_output is not None
+                and hasattr(temp_chart_output, 'selection')
+                and temp_chart_output.selection
+                and "points" in temp_chart_output.selection
+            ):
                 selected_indices = [p["point_index"] for p in temp_chart_output.selection["points"]]
-                filtered_temp_df = filtered_df.iloc[selected_indices]
-            else:
-                filtered_temp_df = filtered_df
 
-            # Stats
+            filtered_temp_df = filtered_df.iloc[selected_indices] if selected_indices else filtered_df
+
             st.subheader("📊 Temperature Statistics")
             for sensor in temp_cols:
                 with st.expander(f"{sensor} Statistics"):
@@ -157,7 +158,9 @@ if fl is not None:
         else:
             st.warning("No temperature columns found")
 
-        # === Humidity Section ===
+        # ==============================
+        # HUMIDITY SECTION
+        # ==============================
         st.subheader("💧 Humidity Sensors Visualization")
         if hum_cols:
             hum_fig = px.line(
@@ -170,16 +173,19 @@ if fl is not None:
             )
             hum_fig.update_layout(dragmode='select')
 
-            # Native selection
-            hum_chart_output = st.plotly_chart(hum_fig, on_select="ignore", key="hum_chart")
+            hum_chart_output = st.plotly_chart(hum_fig, on_select="rerun", key="hum_chart")
 
-            if hasattr(hum_chart_output, 'selection') and hum_chart_output.selection:
+            selected_indices = []
+            if (
+                hum_chart_output is not None
+                and hasattr(hum_chart_output, 'selection')
+                and hum_chart_output.selection
+                and "points" in hum_chart_output.selection
+            ):
                 selected_indices = [p["point_index"] for p in hum_chart_output.selection["points"]]
-                filtered_hum_df = filtered_df.iloc[selected_indices]
-            else:
-                filtered_hum_df = filtered_df
 
-            # Stats
+            filtered_hum_df = filtered_df.iloc[selected_indices] if selected_indices else filtered_df
+
             st.subheader("📊 Humidity Statistics")
             for sensor in hum_cols:
                 with st.expander(f"{sensor} Statistics"):
