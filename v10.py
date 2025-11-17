@@ -14,6 +14,20 @@ st.markdown("<style>div.block-container{padding-top:2rem;} </style>", unsafe_all
 
 # File uploader
 fl = st.file_uploader(" :file_folder: Please upload a file", type=(["csv", "xlsx", "xls", "txt"]))
+st.write("All columns detected:")
+st.write(df.columns)
+
+temp_cols = [col for col in df.columns if 'temp' in col.lower()]
+hum_cols  = [col for col in df.columns if 'hum' in col.lower()]
+
+st.write("Temperature columns found:", temp_cols)
+st.write("Humidity columns found:", hum_cols)
+
+st.write("Temperature sample data:")
+st.write(df[temp_cols].head(5))
+
+st.write("Humidity sample data:")
+st.write(df[hum_cols].head(5))
 
 @cache_data
 def read_file(uploaded_file):
@@ -207,4 +221,5 @@ if fl is not None:
         else:
             st.warning("No humidity columns found")
 else:
+
     st.warning("Please upload a file to proceed.")
