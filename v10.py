@@ -90,6 +90,10 @@ if fl is not None:
 
         # Get sensor lists
         temp_cols = [col for col in filtered_df.columns if 'Temperature' in col]
+        for col in temp_cols:
+            df[col] = df[col].astype(str).str.replace(',', '.')  # replace comma with dot
+            df[col] = df[col].str.extract(r'([-+]?\d*\.?\d+)')    # extract numeric part
+            df[col] = pd.to_numeric(df[col], errors='coerce')     # convert to float
         hum_cols = [col for col in filtered_df.columns if 'Humidity' in col]
 
         # Temperature Plot
@@ -208,5 +212,6 @@ if fl is not None:
 else:
 
     st.warning("Please upload a file to proceed.")
+
 
 
