@@ -14,12 +14,6 @@ st.markdown("<style>div.block-container{padding-top:2rem;} </style>", unsafe_all
 
 # File uploader
 fl = st.file_uploader(" :file_folder: Please upload a file", type=(["csv", "xlsx", "xls", "txt"]))
-st.write("All columns detected:")
-st.write(df.columns)
-
-
-
-
 @cache_data
 def read_file(uploaded_file):
     if uploaded_file is None:
@@ -214,4 +208,5 @@ if fl is not None:
 else:
 
     st.warning("Please upload a file to proceed.")
+
 
